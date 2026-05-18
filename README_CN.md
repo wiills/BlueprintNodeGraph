@@ -10,6 +10,8 @@
 ## UE5 轻量级并行流程编排框架（蓝图原生）
 ### Production-Ready · Battle-tested in Shipped Games
 
+<img width="1378" height="750" alt="Image" src="https://github.com/user-attachments/assets/c583910a-0759-49f1-b9b1-b1df0bd5e71c" />
+
 BlueprintNodeGraph 是专为UE5设计的**蓝图原生异步流程框架**，替代零散延迟/等待节点、简化任务/剧情/关卡逻辑开发，**支撑上线项目全关卡逻辑验证**。
 
 核心优势：**标准蓝图内直接使用、原生并行异步、GC安全、网络同步、低开销易扩展**。
