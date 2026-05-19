@@ -44,9 +44,9 @@ BlueprintNodeGraph is a powerful Unreal Engine plugin that provides a rich set o
 - High performance, low overhead
 
 **Core Files:**
-- [ExLatentTaskBase.h](Source/BlueprintNodeGraph/Public/BlueprintTool/ExLatentTaskBase.h) - Latent task base class
-- [ExLatentActionManager.h](Source/BlueprintNodeGraph/Public/BlueprintTool/ExLatentActionManager.h) - Delegate manager
-- [ExK2Node_LatentTaskCall.h](Source/BlueprintNodeGraphEditor/Public/BlueprintTool/ExK2Node_LatentTaskCall.h) - K2 node extension
+- [ExBase_LatentTask.h](Source/BlueprintNodeGraph/Public/BlueprintTool/LatentTasks/ExBase_LatentTask.h) - Latent task base class
+- [ExLatentActionManager.h](Source/BlueprintNodeGraph/Public/BlueprintTool/Subsystems/ExLatentActionManager.h) - Delegate manager
+- [ExK2Node_LatentTaskCall.h](Source/BlueprintNodeGraphEditor/Public/BlueprintTool/K2Nodes/ExK2Node_LatentTaskCall.h) - K2 node extension
 
 ## Why Choose BlueprintNodeGraph?
 
@@ -80,7 +80,7 @@ BlueprintNodeGraph is a powerful Unreal Engine plugin that provides a rich set o
 
 #### 2. Out-of-the-box Async Execution
 
-**File Location:** [ExLatentProxyDefine.h](Source/BlueprintNodeGraph/Public/BlueprintTool/ExLatentProxyDefine.h)
+**File Location:** [ExLatentProxyDefine.h](Source/BlueprintNodeGraph/Public/BlueprintTool/Common/ExLatentProxyDefine.h)
 
 ```cpp
 // Just drag and use:
@@ -93,7 +93,7 @@ No complex chart configuration needed, just use it!
 
 #### 3. Automatic GC Protection Mechanism
 
-**File Location:** [ExAsyncActionBase.h#L96-113](Source/BlueprintNodeGraph/Public/BlueprintTool/ExAsyncActionBase.h#L96-113)
+**File Location:** [ExBase_AsyncAction.h](Source/BlueprintNodeGraph/Public/BlueprintTool/AsyncActions/ExBase_AsyncAction.h)
 
 ```cpp
 // Automatic object lifecycle handling:
@@ -106,7 +106,7 @@ SetReadyToDestroy();                    // Mark for destruction when complete
 
 #### 4. Timeout Protection Mechanism
 
-**File Location:** [ExLatentNodeInfo](Source/BlueprintNodeGraph/Public/BlueprintTool/ExLatentProxyDefine.h)
+**File Location:** [ExLatentNodeInfo](Source/BlueprintNodeGraph/Public/BlueprintTool/Common/ExLatentProxyDefine.h)
 
 ```
 Node Properties → Configure Time Out: 10.0
@@ -118,7 +118,7 @@ Prevents infinite waiting!
 
 #### 5. Complete Task Lifecycle
 
-**File Location:** [ExLatentTaskBase.h#L61](Source/BlueprintNodeGraph/Public/BlueprintTool/ExLatentTaskBase.h#L61)
+**File Location:** [ExBase_LatentTask.h](Source/BlueprintNodeGraph/Public/BlueprintTool/LatentTasks/ExBase_LatentTask.h)
 
 ```
 CreateTask() → Activate() → Receive On Start → Receive On Stop → Destroy
@@ -210,22 +210,23 @@ That's it! See [Quick Start Guide](Docs/Usage.md#quick-start) for more.
 
 - **[Usage Guide](Docs/Usage.md)** - Complete usage guide, API reference, examples
 - **[Architecture Guide](Docs/Architecture.md)** - Deep dive into plugin architecture and how it works
-- **[Improvement Plan](Docs/improve.md)** - Future improvement directions and suggestions
+- **[Quest System Guide](Docs/QuestSystemGuide.md)** - Hierarchical quest system usage
+- **[Refactoring Plan](Docs/RefactoringPlan.md)** - Naming conventions and directory layout (completed)
 
 ### 🔗 Quick Links
 
 - [Installation Guide](Docs/Usage.md#installation)
 - [API Reference](Docs/Usage.md#basic-node-usage)
-- [Example Project](Content/BP_TestBlueprintNodes.uasset)
+- [Example Project](Content/BP_TestGraph1.uasset)
 - [Architecture Design](Docs/Architecture.md)
 
 ## Examples
 
 The plugin includes multiple example Blueprints demonstrating various features:
 
-- [BP_TestBlueprintNodes](Content/BP_TestBlueprintNodes.uasset) - Basic node usage examples
-- [BP_TestTask](Content/Tasks/BP_TestTask.uasset) - Custom task example 1
-- [BP_TestTask2](Content/Tasks/BP_TestTask2.uasset) - Custom task example 2
+- [BP_TestGraph1](Content/BP_TestGraph1.uasset) - Basic flow graph example
+- [BP_QuestHost](Content/BP_QuestHost.uasset) - Quest system host example
+- [WBP_QuestTree](Content/Quest/WBP_QuestTree.uasset) - Quest tree UI example
 
 These examples are located in the `Content` folder.
 
