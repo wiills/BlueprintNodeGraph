@@ -400,3 +400,9 @@ Start ──→ Loop ──→ Body ──→ Delay ──→ Loop?
                          ↓                    ↓
                       Continue            Completed
 ```
+
+---
+
+## 任务系统
+
+实现类、Rep 数据流、Quest Task 写回路径见 **[QuestSystemGuide.md](./QuestSystemGuide.md)** 与上文模块树中的 `Quest/` 目录。

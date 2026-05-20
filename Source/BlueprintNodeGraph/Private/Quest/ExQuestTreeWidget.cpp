@@ -12,6 +12,25 @@
 #include "Components/Button.h"
 #include "Components/ScrollBox.h"
 #include "Kismet/GameplayStatics.h"
+#include "Quest/ExQuestDefinition.h"
+
+namespace ExQuestTreeWidgetInternal
+{
+	static FText GetObjectiveDisplayText(const FExQuestObjective& Objective)
+	{
+		if (!Objective.Description.IsEmpty())
+		{
+			return Objective.Description;
+		}
+
+		if (Objective.ObjectiveTag.IsValid())
+		{
+			return FText::FromName(Objective.ObjectiveTag.GetTagName());
+		}
+
+		return FText::GetEmpty();
+	}
+}
 
 void UExQuestExpandClickHandler::Setup(UExQuestTreeWidget* InOwner, const FString& InTaskId)
 {
@@ -96,16 +115,52 @@ void UExQuestTreeWidget::SyncDisplayedDataFromManager()
 			if (ManagerData.AllTasks.Num() > 0)
 			{
 				DisplayedQuestData = ManagerData;
+
+				if (const UExQuestDataAsset* QuestAsset = QuestManager->GetLoadedQuestAsset())
+				{
+					DisplayedQuestData.EnrichMetadataFrom(QuestAsset->BuildInitialQuestData());
+				}
 			}
 		}
+	}
+}
+
+void UExQuestTreeWidget::SyncExpansionStateFromQuestData()
+{
+	for (const FExQuestTask& Task : DisplayedQuestData.AllTasks)
+	{
+		if (!Task.TaskId.IsValid())
+		{
+			continue;
+		}
+
+		const FString TaskIdStr = Task.TaskId.ToString();
+		const EExQuestState* const PreviousStatePtr = PreviousTaskStates.Find(TaskIdStr);
+		const bool bHadPreviousState = PreviousStatePtr != nullptr;
+		const EExQuestState PreviousState = bHadPreviousState ? *PreviousStatePtr : EExQuestState::Locked;
+
+		if (Task.State == EExQuestState::Completed)
+		{
+			if (bAutoCollapseOnComplete)
+			{
+				ExpandedTaskIds.Remove(TaskIdStr);
+			}
+			else if (bHadPreviousState && PreviousState == EExQuestState::Active && Task.Objectives.Num() > 0)
+			{
+				ExpandedTaskIds.Add(TaskIdStr);
+			}
+		}
+
+		PreviousTaskStates.Add(TaskIdStr, Task.State);
 	}
 }
 
 void UExQuestTreeWidget::RefreshQuestTree()
 {
 	SyncDisplayedDataFromManager();
+	SyncExpansionStateFromQuestData();
 
-	if (TitleText)
+	if (TitleText && !DisplayedQuestData.QuestSetName.IsEmpty())
 	{
 		TitleText->SetText(DisplayedQuestData.QuestSetName);
 	}
@@ -157,7 +212,8 @@ void UExQuestTreeWidget::CreateQuestItem(const FExQuestTask& QuestTask, UVertica
 
 	const FString TaskIdStr = QuestTask.TaskId.ToString();
 	const bool bHasChildren = DisplayedQuestData.GetSubTasks(QuestTask.TaskId).Num() > 0 || QuestTask.Objectives.Num() > 0;
-	const bool bExpanded = QuestTask.State == EExQuestState::Active || IsQuestExpanded(TaskIdStr);
+	const bool bExpanded = (bAutoExpandActiveQuests && QuestTask.State == EExQuestState::Active)
+		|| IsQuestExpanded(TaskIdStr);
 
 	UHorizontalBox* RowBox = NewObject<UHorizontalBox>(ParentContainer);
 	if (!RowBox)
@@ -221,7 +277,7 @@ void UExQuestTreeWidget::CreateQuestItem(const FExQuestTask& QuestTask, UVertica
 			{
 				const FText ObjectiveDisplayText = FText::Format(
 					NSLOCTEXT("QuestUI", "ObjectiveFormat", "  - {0} ({1}/{2})"),
-					Objective.Description,
+					ExQuestTreeWidgetInternal::GetObjectiveDisplayText(Objective),
 					FText::AsNumber(Objective.CurrentProgress),
 					FText::AsNumber(Objective.TargetProgress));
 				ObjectiveText->SetText(ObjectiveDisplayText);

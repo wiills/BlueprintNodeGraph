@@ -2,6 +2,8 @@
 
 #include "Quest/ExQuestTypes.h"
 
+#include "BlueprintTool/Common/ExLatentProxyDefine.h"
+
 bool FExQuestTask::CanActivate() const
 {
 	return State == EExQuestState::Inactive;
@@ -44,6 +46,35 @@ bool FExQuestTask::IsFullyCompleted() const
 	return true;
 }
 
+bool FExQuestTask::AreAllSubTasksCompleted(const FExQuestData& QuestData) const
+{
+	if (SubTaskIds.IsEmpty())
+	{
+		return true;
+	}
+
+	for (const FGameplayTag& SubTaskId : SubTaskIds)
+	{
+		FExQuestTask SubTask;
+		if (!QuestData.FindTaskById(SubTaskId, SubTask))
+		{
+			return false;
+		}
+
+		if (SubTask.State != EExQuestState::Completed)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
+bool FExQuestTask::IsReadyToComplete(const FExQuestData& QuestData) const
+{
+	return IsFullyCompleted() && AreAllSubTasksCompleted(QuestData);
+}
+
 float FExQuestTask::GetCompletionPercent() const
 {
 	if (Objectives.IsEmpty())
@@ -74,10 +105,50 @@ float FExQuestTask::GetCompletionPercent() const
 	return static_cast<float>(CompletedItems) / static_cast<float>(TotalItems) * 100.0f;
 }
 
+float FExQuestTask::GetAggregateCompletionPercent(const FExQuestData& QuestData) const
+{
+	int32 TotalItems = 0;
+	int32 CompletedItems = 0;
+
+	for (const FExQuestObjective& Objective : Objectives)
+	{
+		if (!Objective.bIsOptional)
+		{
+			TotalItems++;
+			if (Objective.bIsCompleted)
+			{
+				CompletedItems++;
+			}
+		}
+	}
+
+	for (const FGameplayTag& SubTaskId : SubTaskIds)
+	{
+		FExQuestTask SubTask;
+		if (!QuestData.FindTaskById(SubTaskId, SubTask))
+		{
+			continue;
+		}
+
+		TotalItems++;
+		if (SubTask.State == EExQuestState::Completed)
+		{
+			CompletedItems++;
+		}
+	}
+
+	if (TotalItems == 0)
+	{
+		return State == EExQuestState::Completed ? 100.0f : 0.0f;
+	}
+
+	return static_cast<float>(CompletedItems) / static_cast<float>(TotalItems) * 100.0f;
+}
+
 void FExQuestData::RebuildIndices()
 {
 	TaskIdToIndex.Empty();
-	ObjectiveIdToTaskIndex.Empty();
+	ObjectiveTagToTaskIndex.Empty();
 	ParentTaskIdToChildIndices.Empty();
 	PreTaskIdToDependentIndices.Empty();
 
@@ -103,10 +174,24 @@ void FExQuestData::RebuildIndices()
 
 		for (const FExQuestObjective& Objective : Task.Objectives)
 		{
-			if (Objective.ObjectiveId.IsValid())
+			if (!Objective.ObjectiveTag.IsValid())
 			{
-				ObjectiveIdToTaskIndex.Add(Objective.ObjectiveId, TaskIndex);
+				continue;
 			}
+
+			if (const int32* ExistingTaskIndex = ObjectiveTagToTaskIndex.Find(Objective.ObjectiveTag))
+			{
+				const FGameplayTag ExistingTaskId = AllTasks.IsValidIndex(*ExistingTaskIndex)
+					? AllTasks[*ExistingTaskIndex].TaskId
+					: FGameplayTag();
+				UE_LOG(LogBlueprintNodeGraph, Warning,
+					TEXT("RebuildIndices: duplicate ObjectiveTag '%s' on tasks '%s' and '%s'"),
+					*Objective.ObjectiveTag.ToString(),
+					*ExistingTaskId.ToString(),
+					*Task.TaskId.ToString());
+			}
+
+			ObjectiveTagToTaskIndex.Add(Objective.ObjectiveTag, TaskIndex);
 		}
 	}
 }
@@ -155,9 +240,9 @@ bool FExQuestData::FindMutableTaskById(const FGameplayTag& TaskId, FExQuestTask*
 	return false;
 }
 
-bool FExQuestData::FindTaskIdByObjectiveId(const FGameplayTag& ObjectiveId, FGameplayTag& OutTaskId) const
+bool FExQuestData::FindTaskIdByObjectiveTag(const FGameplayTag& ObjectiveTag, FGameplayTag& OutTaskId) const
 {
-	if (const int32* TaskIndex = ObjectiveIdToTaskIndex.Find(ObjectiveId))
+	if (const int32* TaskIndex = ObjectiveTagToTaskIndex.Find(ObjectiveTag))
 	{
 		if (AllTasks.IsValidIndex(*TaskIndex))
 		{
@@ -170,7 +255,7 @@ bool FExQuestData::FindTaskIdByObjectiveId(const FGameplayTag& ObjectiveId, FGam
 	{
 		for (const FExQuestObjective& Objective : Task.Objectives)
 		{
-			if (Objective.ObjectiveId == ObjectiveId)
+			if (Objective.ObjectiveTag == ObjectiveTag)
 			{
 				OutTaskId = Task.TaskId;
 				return true;
@@ -196,7 +281,7 @@ FExQuestRuntimeState FExQuestData::ExtractRuntimeState() const
 		for (const FExQuestObjective& Objective : Task.Objectives)
 		{
 			FExQuestObjectiveRuntime ObjRuntime;
-			ObjRuntime.ObjectiveId = Objective.ObjectiveId;
+			ObjRuntime.ObjectiveTag = Objective.ObjectiveTag;
 			ObjRuntime.CurrentProgress = Objective.CurrentProgress;
 			ObjRuntime.bIsCompleted = Objective.bIsCompleted;
 			TaskRuntime.Objectives.Add(ObjRuntime);
@@ -229,12 +314,57 @@ void FExQuestData::ApplyRuntimeState(const FExQuestRuntimeState& RuntimeState)
 		{
 			for (FExQuestObjective& Objective : Task->Objectives)
 			{
-				if (Objective.ObjectiveId == ObjRuntime.ObjectiveId)
+				if (Objective.ObjectiveTag == ObjRuntime.ObjectiveTag)
 				{
 					Objective.CurrentProgress = ObjRuntime.CurrentProgress;
 					Objective.bIsCompleted = ObjRuntime.bIsCompleted;
 					break;
 				}
+			}
+		}
+	}
+}
+
+void FExQuestData::EnrichMetadataFrom(const FExQuestData& DefinitionData)
+{
+	for (FExQuestTask& Task : AllTasks)
+	{
+		FExQuestTask DefTask;
+		if (!DefinitionData.FindTaskById(Task.TaskId, DefTask))
+		{
+			continue;
+		}
+
+		if (Task.TaskName.IsEmpty() && !DefTask.TaskName.IsEmpty())
+		{
+			Task.TaskName = DefTask.TaskName;
+		}
+
+		if (Task.Description.IsEmpty() && !DefTask.Description.IsEmpty())
+		{
+			Task.Description = DefTask.Description;
+		}
+
+		for (FExQuestObjective& Objective : Task.Objectives)
+		{
+			for (const FExQuestObjective& DefObjective : DefTask.Objectives)
+			{
+				if (Objective.ObjectiveTag != DefObjective.ObjectiveTag)
+				{
+					continue;
+				}
+
+				if (Objective.Description.IsEmpty() && !DefObjective.Description.IsEmpty())
+				{
+					Objective.Description = DefObjective.Description;
+				}
+
+				if (Objective.TargetProgress <= 0 && DefObjective.TargetProgress > 0)
+				{
+					Objective.TargetProgress = DefObjective.TargetProgress;
+				}
+
+				break;
 			}
 		}
 	}

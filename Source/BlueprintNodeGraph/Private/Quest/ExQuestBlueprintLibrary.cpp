@@ -3,48 +3,53 @@
 #include "Quest/ExQuestBlueprintLibrary.h"
 #include "Quest/ExQuestManagerSubsystem.h"
 #include "Quest/ExQuestDefinition.h"
+#include "Quest/ExQuestMessageTypes.h"
+#include "Quest/ExQuestReplicationComponent.h"
+#include "GameFramework/GameplayMessageSubsystem.h"
 #include "Kismet/GameplayStatics.h"
+
+#define LOCTEXT_NAMESPACE "ExQuestExample"
 
 FExQuestData UExQuestBlueprintLibrary::CreateExampleQuestData()
 {
 	FExQuestData QuestData;
 	QuestData.QuestSetId = TEXT("ExampleQuestSet");
-	QuestData.QuestSetName = FText::FromString(TEXT("示例任务集"));
+	QuestData.QuestSetName = NSLOCTEXT("ExQuestExample", "QuestSetName", "Example Quest Set");
 
 	FExQuestTask MainQuest;
 	MainQuest.TaskId = FGameplayTag::RequestGameplayTag(FName("Quest.Main_001"));
-	MainQuest.TaskName = FText::FromString(TEXT("主线任务：拯救世界"));
-	MainQuest.Description = FText::FromString(TEXT("拯救世界于危难之中"));
+	MainQuest.TaskName = NSLOCTEXT("ExQuestExample", "Main001_Name", "Main Quest: Save the World");
+	MainQuest.Description = NSLOCTEXT("ExQuestExample", "Main001_Desc", "Save the world from disaster");
 	MainQuest.State = EExQuestState::Inactive;
 
 	FExQuestObjective Obj1;
-	Obj1.ObjectiveId = FGameplayTag::RequestGameplayTag(FName("Quest.Main_001.Obj_001"));
-	Obj1.Description = FText::FromString(TEXT("找到勇者之剑"));
+	Obj1.ObjectiveTag = FGameplayTag::RequestGameplayTag(FName("Quest.Main_001.Obj_001"));
+	Obj1.Description = NSLOCTEXT("ExQuestExample", "Main001_Obj1", "Find the Hero Sword");
 	Obj1.TargetProgress = 1;
 	MainQuest.Objectives.Add(Obj1);
 
 	FExQuestObjective Obj2;
-	Obj2.ObjectiveId = FGameplayTag::RequestGameplayTag(FName("Quest.Main_001.Obj_002"));
-	Obj2.Description = FText::FromString(TEXT("击败魔王"));
+	Obj2.ObjectiveTag = FGameplayTag::RequestGameplayTag(FName("Quest.Main_001.Obj_002"));
+	Obj2.Description = NSLOCTEXT("ExQuestExample", "Main001_Obj2", "Defeat the Demon King");
 	Obj2.TargetProgress = 1;
 	MainQuest.Objectives.Add(Obj2);
 
 	FExQuestTask SubQuest;
 	SubQuest.TaskId = FGameplayTag::RequestGameplayTag(FName("Quest.Main_001.Sub_001"));
-	SubQuest.TaskName = FText::FromString(TEXT("支线任务：收集装备"));
-	SubQuest.Description = FText::FromString(TEXT("收集强力装备"));
+	SubQuest.TaskName = NSLOCTEXT("ExQuestExample", "Sub001_Name", "Side Quest: Collect Gear");
+	SubQuest.Description = NSLOCTEXT("ExQuestExample", "Sub001_Desc", "Collect powerful equipment");
 	SubQuest.ParentTaskId = MainQuest.TaskId;
 	SubQuest.State = EExQuestState::Locked;
 
 	FExQuestObjective SubObj1;
-	SubObj1.ObjectiveId = FGameplayTag::RequestGameplayTag(FName("Quest.Main_001.Sub_001.Obj_001"));
-	SubObj1.Description = FText::FromString(TEXT("收集10把武器"));
+	SubObj1.ObjectiveTag = FGameplayTag::RequestGameplayTag(FName("Quest.Main_001.Sub_001.Obj_001"));
+	SubObj1.Description = NSLOCTEXT("ExQuestExample", "Sub001_Obj1", "Collect 10 weapons");
 	SubObj1.TargetProgress = 10;
 	SubQuest.Objectives.Add(SubObj1);
 
 	FExQuestObjective SubObj2;
-	SubObj2.ObjectiveId = FGameplayTag::RequestGameplayTag(FName("Quest.Main_001.Sub_001.Obj_002"));
-	SubObj2.Description = FText::FromString(TEXT("收集5套盔甲"));
+	SubObj2.ObjectiveTag = FGameplayTag::RequestGameplayTag(FName("Quest.Main_001.Sub_001.Obj_002"));
+	SubObj2.Description = NSLOCTEXT("ExQuestExample", "Sub001_Obj2", "Collect 5 armor sets");
 	SubObj2.TargetProgress = 5;
 	SubObj2.bIsOptional = true;
 	SubQuest.Objectives.Add(SubObj2);
@@ -53,14 +58,14 @@ FExQuestData UExQuestBlueprintLibrary::CreateExampleQuestData()
 
 	FExQuestTask MainQuest2;
 	MainQuest2.TaskId = FGameplayTag::RequestGameplayTag(FName("Quest.Main_002"));
-	MainQuest2.TaskName = FText::FromString(TEXT("主线任务：恢复和平"));
-	MainQuest2.Description = FText::FromString(TEXT("让世界恢复和平"));
+	MainQuest2.TaskName = NSLOCTEXT("ExQuestExample", "Main002_Name", "Main Quest: Restore Peace");
+	MainQuest2.Description = NSLOCTEXT("ExQuestExample", "Main002_Desc", "Restore peace to the world");
 	MainQuest2.State = EExQuestState::Locked;
 	MainQuest2.PreTaskIds.AddTag(MainQuest.TaskId);
 
 	FExQuestObjective Main2Obj1;
-	Main2Obj1.ObjectiveId = FGameplayTag::RequestGameplayTag(FName("Quest.Main_002.Obj_001"));
-	Main2Obj1.Description = FText::FromString(TEXT("帮助村民重建家园"));
+	Main2Obj1.ObjectiveTag = FGameplayTag::RequestGameplayTag(FName("Quest.Main_002.Obj_001"));
+	Main2Obj1.Description = NSLOCTEXT("ExQuestExample", "Main002_Obj1", "Help villagers rebuild");
 	Main2Obj1.TargetProgress = 1;
 	MainQuest2.Objectives.Add(Main2Obj1);
 
@@ -72,14 +77,16 @@ FExQuestData UExQuestBlueprintLibrary::CreateExampleQuestData()
 	return QuestData;
 }
 
+#undef LOCTEXT_NAMESPACE
+
 FExQuestObjective UExQuestBlueprintLibrary::CreateQuestObjective(
-	const FGameplayTag& ObjectiveId,
+	const FGameplayTag& ObjectiveTag,
 	const FText& Description,
 	int32 TargetProgress,
 	bool bIsOptional)
 {
 	FExQuestObjective Objective;
-	Objective.ObjectiveId = ObjectiveId;
+	Objective.ObjectiveTag = ObjectiveTag;
 	Objective.Description = Description;
 	Objective.TargetProgress = TargetProgress;
 	Objective.bIsOptional = bIsOptional;
@@ -88,7 +95,7 @@ FExQuestObjective UExQuestBlueprintLibrary::CreateQuestObjective(
 	return Objective;
 }
 
-FExQuestTask UExQuestBlueprintLibrary::CreateQuestTask(
+FExQuestTask UExQuestBlueprintLibrary::MakeQuestTaskData(
 	const FGameplayTag& TaskId,
 	const FText& TaskName,
 	const FText& Description,
@@ -163,9 +170,19 @@ float UExQuestBlueprintLibrary::GetQuestCompletionPercent(const FExQuestTask& Ta
 	return Task.GetCompletionPercent();
 }
 
+float UExQuestBlueprintLibrary::GetQuestAggregateCompletionPercentWithData(const FExQuestData& QuestData, const FExQuestTask& Task)
+{
+	return Task.GetAggregateCompletionPercent(QuestData);
+}
+
 bool UExQuestBlueprintLibrary::IsQuestFullyCompleted(const FExQuestTask& Task)
 {
 	return Task.IsFullyCompleted();
+}
+
+bool UExQuestBlueprintLibrary::IsQuestReadyToCompleteWithData(const FExQuestData& QuestData, const FExQuestTask& Task)
+{
+	return Task.IsReadyToComplete(QuestData);
 }
 
 bool UExQuestBlueprintLibrary::CanQuestUnlockWithData(const FExQuestData& QuestData, const FGameplayTag& TaskId)
@@ -208,17 +225,17 @@ FText UExQuestBlueprintLibrary::GetQuestStateText(EExQuestState State)
 	switch (State)
 	{
 	case EExQuestState::Inactive:
-		return NSLOCTEXT("QuestUI", "StateInactive", "未激活");
+		return NSLOCTEXT("QuestUI", "StateInactive", "Inactive");
 	case EExQuestState::Active:
-		return NSLOCTEXT("QuestUI", "StateActive", "进行中");
+		return NSLOCTEXT("QuestUI", "StateActive", "Active");
 	case EExQuestState::Completed:
-		return NSLOCTEXT("QuestUI", "StateCompleted", "已完成");
+		return NSLOCTEXT("QuestUI", "StateCompleted", "Completed");
 	case EExQuestState::Failed:
-		return NSLOCTEXT("QuestUI", "StateFailed", "失败");
+		return NSLOCTEXT("QuestUI", "StateFailed", "Failed");
 	case EExQuestState::Locked:
-		return NSLOCTEXT("QuestUI", "StateLocked", "已锁定");
+		return NSLOCTEXT("QuestUI", "StateLocked", "Locked");
 	default:
-		return NSLOCTEXT("QuestUI", "StateUnknown", "未知");
+		return NSLOCTEXT("QuestUI", "StateUnknown", "Unknown");
 	}
 }
 
@@ -248,30 +265,66 @@ UExQuestManagerSubsystem* UExQuestBlueprintLibrary::GetQuestManager(UObject* Wor
 	return nullptr;
 }
 
-bool UExQuestBlueprintLibrary::UnlockQuest(UObject* WorldContextObject, const FGameplayTag& TaskId)
+UExQuestReplicationComponent* UExQuestBlueprintLibrary::EnsureQuestReplicationOnGameState(UObject* WorldContextObject)
 {
-	if (UExQuestManagerSubsystem* QuestManager = GetQuestManager(WorldContextObject))
-	{
-		return QuestManager->UnlockQuest(TaskId);
-	}
-	return false;
+	return UExQuestReplicationComponent::EnsureOnGameState(WorldContextObject);
 }
 
-bool UExQuestBlueprintLibrary::IncrementQuestObjective(UObject* WorldContextObject, const FGameplayTag& TaskId, const FGameplayTag& ObjectiveId, int32 Delta)
+bool UExQuestBlueprintLibrary::UnlockQuest(UObject* WorldContextObject, const FGameplayTag& TaskId)
 {
-	if (UExQuestManagerSubsystem* QuestManager = GetQuestManager(WorldContextObject))
+	return UExQuestReplicationComponent::RouteUnlockQuest(WorldContextObject, TaskId);
+}
+
+bool UExQuestBlueprintLibrary::ActivateQuest(UObject* WorldContextObject, const FGameplayTag& TaskId)
+{
+	return UExQuestReplicationComponent::RouteActivateQuest(WorldContextObject, TaskId);
+}
+
+bool UExQuestBlueprintLibrary::EnsureQuestActive(UObject* WorldContextObject, const FGameplayTag& TaskId)
+{
+	if (!TaskId.IsValid())
 	{
-		return QuestManager->IncrementQuestObjective(TaskId, ObjectiveId, Delta);
+		return false;
 	}
-	return false;
+
+	UExQuestReplicationComponent::RouteUnlockQuest(WorldContextObject, TaskId);
+	return UExQuestReplicationComponent::RouteActivateQuest(WorldContextObject, TaskId);
+}
+
+bool UExQuestBlueprintLibrary::IncrementQuestObjective(UObject* WorldContextObject, const FGameplayTag& TaskId, const FGameplayTag& ObjectiveTag, int32 Delta)
+{
+	return UExQuestReplicationComponent::RouteIncrementQuestObjective(WorldContextObject, TaskId, ObjectiveTag, Delta);
+}
+
+bool UExQuestBlueprintLibrary::NotifyObjectiveProgressByTag(UObject* WorldContextObject, const FGameplayTag& ObjectiveTag, int32 Delta)
+{
+	return UExQuestReplicationComponent::RouteNotifyObjectiveProgressByTag(WorldContextObject, ObjectiveTag, Delta);
+}
+
+void UExQuestBlueprintLibrary::BroadcastQuestObjectiveProgress(UObject* WorldContextObject, const FGameplayTag& ObjectiveTag, int32 Delta, FGameplayTag OptionalTaskId)
+{
+	if (!WorldContextObject || !ObjectiveTag.IsValid() || Delta <= 0)
+	{
+		return;
+	}
+
+	FExQuestObjectiveProgressMessage Message;
+	Message.ObjectiveTag = ObjectiveTag;
+	Message.Delta = Delta;
+	Message.TaskId = OptionalTaskId;
+
+	const FGameplayTag Channel = ExQuestMessageTags::GetObjectiveProgressChannel();
+	if (!Channel.IsValid())
+	{
+		return;
+	}
+
+	UGameplayMessageSubsystem::Get(WorldContextObject).BroadcastMessage(Channel, Message);
 }
 
 void UExQuestBlueprintLibrary::LoadQuestFromAsset(UObject* WorldContextObject, UExQuestDataAsset* QuestAsset, bool bPreserveRuntime)
 {
-	if (UExQuestManagerSubsystem* QuestManager = GetQuestManager(WorldContextObject))
-	{
-		QuestManager->LoadQuestFromAsset(QuestAsset, bPreserveRuntime);
-	}
+	UExQuestReplicationComponent::RouteLoadQuestFromAsset(WorldContextObject, QuestAsset, bPreserveRuntime);
 }
 
 FExQuestData UExQuestBlueprintLibrary::BuildQuestDataFromAsset(const UExQuestDataAsset* QuestAsset)
@@ -281,6 +334,14 @@ FExQuestData UExQuestBlueprintLibrary::BuildQuestDataFromAsset(const UExQuestDat
 		return QuestAsset->BuildInitialQuestData();
 	}
 	return FExQuestData();
+}
+
+FExQuestData UExQuestBlueprintLibrary::BuildQuestDataFromTaskTable(
+	const UDataTable* TaskTable,
+	const FText& InQuestSetName,
+	const FString& InQuestSetId)
+{
+	return UExQuestDataAsset::BuildQuestDataFromTaskTable(TaskTable, InQuestSetName, InQuestSetId);
 }
 
 FString UExQuestBlueprintLibrary::SaveQuestProgressAsJson(UObject* WorldContextObject)
@@ -294,11 +355,7 @@ FString UExQuestBlueprintLibrary::SaveQuestProgressAsJson(UObject* WorldContextO
 
 bool UExQuestBlueprintLibrary::LoadQuestProgressFromJson(UObject* WorldContextObject, const FString& JsonSaveData)
 {
-	if (UExQuestManagerSubsystem* QuestManager = GetQuestManager(WorldContextObject))
-	{
-		return QuestManager->LoadQuestProgressFromJson(JsonSaveData);
-	}
-	return false;
+	return UExQuestReplicationComponent::RouteLoadQuestProgressFromJson(WorldContextObject, JsonSaveData);
 }
 
 FExQuestRuntimeState UExQuestBlueprintLibrary::ExtractRuntimeStateFromData(const FExQuestData& QuestData)
@@ -308,10 +365,7 @@ FExQuestRuntimeState UExQuestBlueprintLibrary::ExtractRuntimeStateFromData(const
 
 void UExQuestBlueprintLibrary::ApplyRuntimeStateToManager(UObject* WorldContextObject, const FExQuestRuntimeState& RuntimeState)
 {
-	if (UExQuestManagerSubsystem* QuestManager = GetQuestManager(WorldContextObject))
-	{
-		QuestManager->ApplyRuntimeState(RuntimeState);
-	}
+	UExQuestReplicationComponent::RouteApplyRuntimeState(WorldContextObject, RuntimeState);
 }
 
 FGameplayTag UExQuestBlueprintLibrary::MakeQuestTag(const FString& TagString)

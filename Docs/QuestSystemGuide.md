@@ -1,292 +1,182 @@
-# 任务系统使用指南
+# 任务系统指南
+
+> UTF-8。通用 Latent 节点见 [Usage.md](./Usage.md)；类与数据流见 [Architecture.md](./Architecture.md#任务系统)。
+
+---
 
 ## 概述
 
-BlueprintNodeGraph 插件提供层级任务系统，支持：
+层级任务系统：`UExQuestDataAsset`（策划）→ Server Load → `UExQuestManagerSubsystem` → 联机复制 → `UExQuestTreeWidget`。
 
-- **扁平存储 + 父子关系**：`AllTasks` 列表 + `ParentTaskId` / `SubTaskIds`
-- **GameplayTag ID**：任务与目标均使用 `FGameplayTag`
-- **目标进度**：多目标、可选目标、自动完成流转
-- **前置任务**：`PreTaskIds` 在激活时校验；前置完成后自动 `Locked` → `Inactive`
-- **解锁**：`UnlockQuest` 将满足条件的 `Locked` 任务变为 `Inactive`
-- **DataAsset 配置**：`UExQuestDataAsset` 存静态定义，运行时由 Manager 合并
-- **存档**：默认 JSON `#ExQuestSaveV2`；兼容加载 V1 文本
-- **UI**：`UExQuestTreeWidget` 自动同步 Subsystem 数据
-
----
-
-## 快速开始
-
-### 1. 创建任务数据
-
-#### 方法一：使用蓝图函数库（推荐）
-
-```cpp
-#include "Quest/ExQuestBlueprintLibrary.h"
-
-FExQuestData QuestData = UExQuestBlueprintLibrary::CreateExampleQuestData();
-```
-
-或在蓝图中调用 **Create Example Quest Data**。
-
-#### 方法二：C++ 手动构建
-
-```cpp
-#include "Quest/ExQuestTypes.h"
-
-FExQuestTask MainQuest;
-MainQuest.TaskId = FGameplayTag::RequestGameplayTag(FName("Quest.Main_001"));
-MainQuest.TaskName = FText::FromString(TEXT("主线任务：拯救世界"));
-MainQuest.State = EExQuestState::Inactive;
-
-FExQuestObjective Obj1;
-Obj1.ObjectiveId = FGameplayTag::RequestGameplayTag(FName("Quest.Main_001.Obj_001"));
-Obj1.Description = FText::FromString(TEXT("找到勇者之剑"));
-Obj1.TargetProgress = 1;
-MainQuest.Objectives.Add(Obj1);
-
-FExQuestTask SubQuest;
-SubQuest.TaskId = FGameplayTag::RequestGameplayTag(FName("Quest.Main_001.Sub_001"));
-SubQuest.ParentTaskId = MainQuest.TaskId;
-SubQuest.State = EExQuestState::Locked;
-MainQuest.SubTaskIds.AddTag(SubQuest.TaskId);
-
-FExQuestData QuestData;
-QuestData.QuestSetName = FText::FromString(TEXT("主线任务集"));
-QuestData.AllTasks.Add(MainQuest);
-QuestData.AllTasks.Add(SubQuest);
-```
-
-> **注意**：任务存储在 `AllTasks` 扁平数组中，子任务通过 `ParentTaskId` 关联，不是嵌套 `SubTasks` 数组。
-
-### 2. 初始化任务管理器
-
-#### 方式 A：运行时数据（代码/蓝图构建）
-
-```cpp
-#include "Quest/ExQuestManagerSubsystem.h"
-
-if (UExQuestManagerSubsystem* QuestManager = GameInstance->GetSubsystem<UExQuestManagerSubsystem>())
-{
-	QuestManager->LoadQuestData(QuestData);
-}
-```
-
-#### 方式 B：DataAsset（推荐策划配置）
-
-1. 内容浏览器 → **右键** → **杂项** → **数据资产** → `ExQuestDataAsset`
-2. 填写 `TaskDefinitions`（`InitialState`、目标、前置、父子关系）
-3. 加载：
-
-```cpp
-#include "Quest/ExQuestDefinition.h"
-
-QuestManager->LoadQuestFromAsset(MyQuestAsset, /*bPreserveRuntime*/ false);
-// 热更资产且保留进度：
-QuestManager->LoadQuestFromAsset(MyQuestAsset, true);
-```
-
-蓝图：**Load Quest From Asset**。
-
-### 3. 激活与更新
-
-```cpp
-// 激活（仅 Inactive 可激活；会校验 PreTaskIds）
-QuestManager->ActivateQuest(FGameplayTag::RequestGameplayTag(FName("Quest.Main_001")));
-
-// 手动解锁 Locked 任务（前置已满足时）
-QuestManager->UnlockQuest(FGameplayTag::RequestGameplayTag(FName("Quest.Main_002")));
-
-// 增量更新目标
-QuestManager->IncrementQuestObjective(TaskId, ObjectiveId, 1);
-
-// 更新目标进度（全部必选目标完成后自动将任务设为 Completed，并解锁后续任务）
-QuestManager->UpdateQuestObjective(
-	FGameplayTag::RequestGameplayTag(FName("Quest.Main_001")),
-	FGameplayTag::RequestGameplayTag(FName("Quest.Main_001.Obj_001")),
-	1);
-
-// 或直接完成目标
-QuestManager->CompleteQuestObjective(
-	FGameplayTag::RequestGameplayTag(FName("Quest.Main_001")),
-	FGameplayTag::RequestGameplayTag(FName("Quest.Main_001.Obj_001")));
-```
-
-### 4. 事件绑定
-
-```cpp
-QuestManager->OnQuestStateChanged.AddDynamic(this, &UMyClass::HandleQuestStateChanged);
-QuestManager->OnQuestProgressChanged.AddDynamic(this, &UMyClass::HandleQuestProgressChanged);
-QuestManager->OnQuestObjectiveUpdated.AddDynamic(this, &UMyClass::HandleQuestObjectiveUpdated);
-QuestManager->OnQuestDataLoaded.AddDynamic(this, &UMyClass::HandleQuestDataLoaded);
-```
-
-### 5. 任务树 UI
-
-1. 创建继承自 `ExQuestTreeWidget` 的用户控件
-2. 绑定组件：`QuestScrollBox`、`RootQuestContainer`、`TitleText`
-3. 在关卡中：
-
-```cpp
-#include "Quest/ExQuestTreeWidget.h"
-
-UExQuestTreeWidget* Widget = CreateWidget<UExQuestTreeWidget>(GetWorld(), WidgetClass);
-Widget->AddToViewport();
-Widget->SetQuestData(QuestManager->GetQuestData()); // 同时写入 Manager
-```
-
-`bAutoSyncFromManager` 默认为 `true`：Manager 状态变化时 UI 自动从 Subsystem 拉取最新数据。
-
-### 6. 存档
-
-```cpp
-// 默认 JSON V2
-FString SaveData = QuestManager->SaveQuestProgress();
-QuestManager->LoadQuestProgress(SaveData);
-
-// 仅运行时进度（不含文案，适合嵌入总存档）
-FExQuestRuntimeState Runtime = QuestManager->GetRuntimeState();
-QuestManager->ApplyRuntimeState(Runtime);
-
-// 显式旧版文本 V1 导出
-FString Legacy = QuestManager->SaveQuestProgressAsTextV1();
-```
-
-**JSON V2**（`SaveQuestProgress` / `SaveQuestProgressAsJson`）示例头：
-
-```
-#ExQuestSaveV2
-{"Version":2,"QuestSetId":"ExampleQuestSet","Tasks":[...]}
-```
-
-**V1 文本**仍可通过 `LoadQuestProgress` 加载；`SaveQuestProgressAsTextV1` 可导出。
-
-`LoadQuestProgress` / `LoadQuestProgressFromJson` 失败返回 `false`；成功广播 `OnQuestDataLoaded`。
-
----
-
-## 数据结构
-
-### FExQuestObjective
-
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| ObjectiveId | FGameplayTag | 目标 ID |
-| Description | FText | 描述 |
-| CurrentProgress | int32 | 当前进度 |
-| TargetProgress | int32 | 目标进度 |
-| bIsCompleted | bool | 是否完成 |
-| bIsOptional | bool | 是否可选 |
-
-### FExQuestTask
-
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| TaskId | FGameplayTag | 任务 ID |
-| TaskName | FText | 名称 |
-| State | EExQuestState | 状态 |
-| Objectives | TArray | 目标列表 |
-| SubTaskIds | FGameplayTagContainer | 子任务 ID（引用） |
-| PreTaskIds | FGameplayTagContainer | 前置任务 ID |
-| ParentTaskId | FGameplayTag | 父任务 ID |
-
-### FExQuestData
-
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| QuestSetId | FString | 任务集 ID |
-| QuestSetName | FText | 任务集名称 |
-| AllTasks | TArray\<FExQuestTask\> | 所有任务（扁平，定义+运行时合并） |
-
-查询辅助：`GetRootTasks()`、`GetSubTasks(ParentId)`、`CanActivateTask(TaskId)`、`RebuildIndices()`。
-
-### FExQuestRuntimeState / UExQuestDataAsset
-
-| 类型 | 用途 |
+| 能力 | 说明 |
 |------|------|
-| `UExQuestDataAsset` | 策划配置：`TaskDefinitions`、`InitialState` |
-| `FExQuestRuntimeState` | 仅状态与目标进度，可单独序列化 |
-| `FExQuestTaskDefinition` | 单任务静态定义 → `ToRuntimeTask()` |
+| 数据 | `DT_Quest_*` → `DA_Quest_*`（`FExQuestTaskTableRow`） |
+| 玩法链 | `AExQuestAgentActor` + **Quest Task** Latent |
+| 联机 | `UExQuestReplicationComponent` on GameState，蓝图库 **Route** API |
+| 解耦推进 | GameplayMessageRouter → `NotifyObjectiveProgressByTag` |
+| 存档 | JSON `#ExQuestSaveV2` |
+
+---
+
+## 术语
+
+| 类型 | 字段 | 含义 |
+|------|------|------|
+| **Task** | `TaskId` | 一条任务线（主线 / POI / 支线），有独立 `State` |
+| **Objective** | `ObjectiveTag` | Task 内勾选/计数项，**不是**子任务 |
+| **SubTask** | 另一个 `TaskId` | 挂在父 Task 下，独立状态 |
+
+```
+Task (Quest.Main)
+  ├── Objectives[]     ← 同 Task 内清单
+  └── SubTaskIds[]     ← 指向 AllTasks 中另一行 Task
+```
+
+**建模**：同标题多勾选 → **Objective**；可单独解锁的一条线 / POI → **SubTask**。同一 QuestSet 内 **ObjectiveTag 建议全局唯一**。
+
+**层级字段**（DT/DA 每行一条 Task）：
+
+| 字段 | 用途 |
+|------|------|
+| `Parent Task Id`（子行必填） | 任务树 UI 挂父节点；**仅填父行 SubTaskIds 不会显示子任务** |
+| `Sub Task Ids`（父行） | 父 Task 自动 Completed 的汇总（全部子 Task Completed） |
+| `Objectives[]` | 该 Task 内进度清单 |
+
+父 Task 自动 Completed（`IsReadyToComplete`）：**全部必填 Objective 完成** 且 **`SubTaskIds` 子 Task 均为 Completed**。
 
 ---
 
 ## 任务状态
 
-```cpp
-enum class EExQuestState : uint8
-{
-	Inactive,   // 可激活（ActivateQuest）
-	Active,     // 进行中
-	Completed,  // 已完成
-	Failed,     // 失败
-	Locked      // 锁定（需 UnlockQuest 或满足前置后自动解锁为 Inactive）
-};
-```
+| 状态 | API |
+|------|-----|
+| Locked → Inactive | `Unlock Quest` |
+| Inactive → Active | `Activate Quest` / `Ensure Quest Active` |
+| Active 中改 Objective | Quest Task / `Increment Quest Objective` |
+| 结束 | `CompleteQuest` 或自动汇总 |
 
-**状态流转要点**：
-
-- `Locked` 不能直接 `ActivateQuest`，需先变为 `Inactive`
-- 前置任务 `Completed` 后，依赖该前置的 `Locked` 任务自动变为 `Inactive`
-- 父任务 `Completed` 后，子任务（`ParentTaskId`）若为 `Locked` 也会自动变为 `Inactive`
-- `bIsRepeatable` 为 true 时，完成后重置为 `Inactive` 并清空目标进度
+`Unlock` 不会直接变 Active；Quest Task 默认 OnStart **Auto Ensure Active**（Unlock + Activate）。
 
 ---
 
-## 与 BlueprintNodeGraph 延迟任务集成
+## 快速上手（BNGDemo）
 
-任务系统与 LatentTask **无内置硬耦合**，可按需在蓝图/C++ 中桥接：
+插件路径 `/BlueprintNodeGraph/Quest/`：
 
-```cpp
-#include "BlueprintTool/LatentTasks/ExLatentTask_Custom.h"
-
-// K2 工厂：创建可 BP 继承的 Latent Task
-UExLatentTask_Custom* TaskProxy = UExLatentTask_Custom::CreateProxy(
-	WorldContextObject, MyLatentTaskClass);
-
-// 绑定 UExBase_LatentTask 的委托
-TaskProxy->CompleteDelegate.AddDynamic(this, &UMyClass::OnLatentTaskComplete);
-TaskProxy->Activate();
-```
-
-自定义 Latent Task 应继承 `UExLatentTask_Custom`（自定义）或 `UExLatentTask_Saveable`（需存档）。
-
----
-
-## 蓝图常用节点
-
-| 功能 | 节点 |
+| 资产 | 说明 |
 |------|------|
-| 创建示例数据 | Create Example Quest Data |
-| 获取 Manager | Get Quest Manager |
-| 激活任务 | Activate Quest |
-| 解锁任务 | Unlock Quest |
-| 更新目标 | Update Quest Objective |
-| 增量目标 | Increment Quest Objective |
-| 检查可激活 | Can Quest Activate With Data |
-| 检查可解锁 | Can Quest Unlock With Data |
-| 获取根任务 | Get Root Quests In Data |
-| 从资产加载 | Load Quest From Asset |
-| 资产转数据 | Build Quest Data From Asset |
-| JSON 存档 | Save / Load Quest Progress As Json |
-| 提取运行时 | Extract Runtime State From Data |
+| `DT_Quest_Test` | 策划表 |
+| `DA_Quest_Test` | 运行时 Load（保存 DT 可自动同步） |
+| `BP_QuestHost` | `AExQuestAgentActor`，每关 **一个** |
+| `WBP_QuestTree` | `UExQuestTreeWidget`，`bAutoSyncFromManager = true` |
+
+已在 Standalone / Listen Server / Dedicated Server + Client 验证。
+
+### 数据
+
+1. DataTable Row Type = `FExQuestTaskTableRow`，每行一条 Task。
+2. 保存 `DT_Quest_*` → 默认同步 `DA_Quest_*`（`DefaultBlueprintNodeGraph.ini` → `bAutoImportQuestTableOnSave`）；或右键 **Import To Paired Quest Data Asset**。
+3. Tag 注册于 `DefaultGameplayTags.ini`；运行时 **只 Load DA**。
+
+示例行：
+
+| TaskId | ParentTaskId | SubTaskIds |
+|--------|--------------|------------|
+| `Quest.Test.Main` | — | `Quest.Test.Sub_A` |
+| `Quest.Test.Sub_A` | `Quest.Test.Main` | — |
+
+### Agent 接线
+
+**勿**在 BeginPlay 用 `Switch Has Authority` 混跑 Server 链与 UI：
+
+```
+Event On Server Ready     → Quest Task 链（仅 Authority，Auto Load DA 后）
+Event On Client Ready     → Create WBP_QuestTree → Add to Viewport
+```
+
+| 模式 | Server Ready | Client Ready |
+|------|:------------:|:------------:|
+| Standalone / Listen 主机 | ✅ | ✅ |
+| Dedicated Server | ✅ | ❌ |
+| Dedicated Client | ❌ | ✅ |
+
+- Client **不** Load DA、**不**跑 Quest Task 写回链。
+- 薄触发（Terminal/Volume）只 **Call Custom Event on Agent**。
+- 本图顺序在 Agent Quest Task 链；跨图硬门槛用 DA `PreTaskIds`。
+
+### Quest Task 写回
+
+继承 **`UExLatentTask_Quest`**，用 **Quest Task** 节点（勿 Create Latent Task 创建 Quest 子类）。
+
+| Objective Tag | 成功结束 |
+|---------------|----------|
+| 有值 | Increment / Complete Objective |
+| **None** | **CompleteQuest(Quest Tag)**（整 Task，适合 SubTask 整段玩法） |
+
+高级引脚（节点 ▼）：Complete Action、Progress Delta、Apply Quest on Successful Stop、Auto Ensure Active On Start。
+
+示意链：
+
+```
+Event On Server Ready
+  → Quest Task (Main, Step1)      // Objective
+  → Quest Task (Sub_A, None)      // Complete SubTask
+```
+
+### 联机
+
+- 推荐 GameMode **Game State** = `AExQuestGameStateBase`。
+- 兜底：Server 首次 Load DA 时 **`EnsureOnGameState`** 自动 Add Rep 组件。
+- 玩法写回统一用蓝图库 **Route** 节点（Client → Server RPC）。
+
+### 进测检查
+
+- [ ] 关卡一个 `BP_QuestHost` + `DA_Quest_Test`
+- [ ] 子 Task 独立行且 `Parent Task Id` 正确
+- [ ] Server 链 / UI 分别在 Server Ready、Client Ready
+- [ ] Client 不 Load DA；Dedicated Server 不 Create Widget
 
 ---
 
-## 最佳实践
+## 蓝图库（Route）
 
-1. **GameplayTag 命名**：`Quest.Chapter01.Main001`、`Quest.Chapter01.Main001.Obj_001`
-2. **前置任务**：用 `Add Pre Task Id` 或 `PreTaskIds`，激活时自动校验
-3. **层级**：用 `ParentTaskId` + `AllTasks`，避免嵌套 struct
-4. **UI**：优先通过 Manager API 改状态，让 Widget 自动同步
-5. **存档**：将 `SaveQuestProgress` 字符串并入游戏存档系统
+| 节点 | 用途 |
+|------|------|
+| Load Quest From Asset | Server/Standalone 加载 DA |
+| Unlock / Activate / Ensure Quest Active | 状态 |
+| Increment Quest Objective | Objective +Delta |
+| Notify Objective Progress By Tag | 按 Tag 反查 Task |
+| Ensure Quest Replication On GameState | 手动确保 Rep 组件 |
+| Broadcast Quest Objective Progress | 发 MessageRouter 消息 |
+| Make Quest Task Data | 拼结构体（**不是** Quest Task 节点） |
+| Build Quest Data From Task Table | 调试直读表 |
 
 ---
 
-## 示例资产
+## GameplayMessageRouter
 
-插件 Content 目录：
+```cpp
+QuestManager->NotifyObjectiveProgressByTag(ObjectiveTag, 1);
+// 或 Broadcast Quest Objective Progress → 频道 Quest.Event.Objective.Progress
+```
 
-- `Content/Quest/WBP_QuestTree.uasset` — 任务树 UI 示例
-- `Content/BP_QuestHost.uasset` — 任务宿主示例
+`UExQuestMessageRouterBridge` 监听并 Route 到 Server Manager。仅 **Active** Task 累计进度。
 
-示例代码见 `UExQuestBlueprintLibrary::CreateExampleQuestData()`。
+---
+
+## 分工
+
+| 内容 | 位置 |
+|------|------|
+| 本图步骤顺序 | Agent Quest Task 链 |
+| 任务树 / Objective / 汇总 | DA |
+| 任务 UI | `WBP_QuestTree`（Client Ready） |
+| 运行时权威 | Server Manager + GameState Rep |
+
+---
+
+## 相关文档
+
+- [Usage.md](./Usage.md) — Loop Delay、Create Latent Task 等通用节点
+- [Architecture.md](./Architecture.md) — 模块结构与运行时数据流
+- [README.md](./README.md) — 文档 UTF-8 约定

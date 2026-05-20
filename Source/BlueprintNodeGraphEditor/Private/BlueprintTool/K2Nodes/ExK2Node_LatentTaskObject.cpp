@@ -11,21 +11,18 @@
 #include "KismetCompiler.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "BlueprintTool/LatentTasks/ExLatentTask_Custom.h"
+#include "BlueprintTool/LatentTasks/ExLatentTask_Quest.h"
 
 #define LOCTEXT_NAMESPACE "UExK2Node_LatentTaskObject"
-
-
-// proxy class
-using LatentTaskClassDefine = UExLatentTask_Custom;
 
 UExK2Node_LatentTaskObject::UExK2Node_LatentTaskObject(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	ProxyFactoryFunctionName = GET_FUNCTION_NAME_CHECKED(LatentTaskClassDefine, CreateProxy);
-	ProxySetK2NodeInfoFunctionName = GET_FUNCTION_NAME_CHECKED(LatentTaskClassDefine, SetK2NodeInfo);
-	ProxyActivateFunctionName = GET_FUNCTION_NAME_CHECKED(LatentTaskClassDefine, Activate);
-	ProxyFactoryClass = LatentTaskClassDefine::StaticClass();
-	ProxyClass = LatentTaskClassDefine::StaticClass();
+	ProxyFactoryFunctionName = GET_FUNCTION_NAME_CHECKED(UExLatentTask_Custom, CreateProxy);
+	ProxySetK2NodeInfoFunctionName = GET_FUNCTION_NAME_CHECKED(UExLatentTask_Custom, SetK2NodeInfo);
+	ProxyActivateFunctionName = GET_FUNCTION_NAME_CHECKED(UExLatentTask_Custom, Activate);
+	ProxyFactoryClass = UExLatentTask_Custom::StaticClass();
+	ProxyClass = UExLatentTask_Custom::StaticClass();
 }
 
 bool UExK2Node_LatentTaskObject::CanCreateUnderSpecifiedSchema(const UEdGraphSchema* DesiredSchema) const
@@ -109,6 +106,11 @@ UClass* UExK2Node_LatentTaskObject::GetClassToSpawn(const TArray<UEdGraphPin*>* 
 	{
 		UEdGraphPin* SourcePin = ClassPin->LinkedTo[0];
 		UseSpawnClass = SourcePin ? Cast<UClass>(SourcePin->PinType.PinSubCategoryObject.Get()) : nullptr;
+	}
+
+	if (UseSpawnClass && UseSpawnClass->IsChildOf(UExLatentTask_Quest::StaticClass()))
+	{
+		UseSpawnClass = UExLatentTask_Custom::StaticClass();
 	}
 
 	return UseSpawnClass;
@@ -218,13 +220,6 @@ void UExK2Node_LatentTaskObject::PinDefaultValueChanged(UEdGraphPin* ChangedPin)
 UEdGraphPin* UExK2Node_LatentTaskObject::GetResultPin() const
 {
 	UEdGraphPin* Pin = FindPinChecked(UEdGraphSchema_K2::PN_ReturnValue);
-	check(Pin->Direction == EGPD_Output);
-	return Pin;
-}
-
-UEdGraphPin* UExK2Node_LatentTaskObject::GetThenPin() const
-{
-	UEdGraphPin* Pin = FindPinChecked(UEdGraphSchema_K2::PN_Then);
 	check(Pin->Direction == EGPD_Output);
 	return Pin;
 }
