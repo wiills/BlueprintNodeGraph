@@ -55,14 +55,14 @@ BlueprintNodeGraph is a powerful Unreal Engine plugin that provides a rich set o
 | Feature | **BlueprintNodeGraph** | FlowGraph | StateTree |
 |---------|----------------------|-----------|-----------|
 | **Core Purpose** | Pure Blueprint async node system | Visual node programming | State machine system |
-| **Learning Curve** | âœ?**Extremely Low** (like using existing nodes) | High (need to learn specific concepts) | High (need to learn state machine concepts) |
-| **Usage Method** | âœ?**Drag nodes directly in standard Blueprint Editor** | Need to open separate FlowGraph Editor | Need to open specialized Editor |
-| **Async Execution** | âœ?**Native async support** | Need additional implementation | Mainly synchronous |
-| **Timeout Mechanism** | âœ?**Built-in timeout protection** | Need to implement manually | Need to implement manually |
-| **GC Protection** | âœ?**Automatic GC-safe** | Need manual management | Need manual management |
-| **Network Replication** | âœ?**Direct support** | Need to implement manually | Need to implement manually |
-| **Latent Loop** | âœ?**Loop Delay and other ready-to-use nodes** | Need to combine nodes | Not applicable |
-| **Multi-branch Sync** | âœ?**Wait Branches and other ready-to-use nodes** | Need to build manually | Need to combine state transitions |
+| **Learning Curve** | **Extremely Low** (like using existing nodes) | High (need to learn specific concepts) | High (need to learn state machine concepts) |
+| **Usage Method** | **Drag nodes directly in standard Blueprint Editor** | Need to open separate FlowGraph Editor | Need to open specialized Editor |
+| **Async Execution** | **Native async support** | Need additional implementation | Mainly synchronous |
+| **Timeout Mechanism** | **Built-in timeout protection** | Need to implement manually | Need to implement manually |
+| **GC Protection** | **Automatic GC-safe** | Need manual management | Need manual management |
+| **Network Replication** | **Direct support** | Need to implement manually | Need to implement manually |
+| **Latent Loop** | **Loop Delay and other ready-to-use nodes** | Need to combine nodes | Not applicable |
+| **Multi-branch Sync** | **Wait Branches and other ready-to-use nodes** | Need to build manually | Need to combine state transitions |
 
 ### ðŸ’¡ Our Core Advantages
 
@@ -73,10 +73,10 @@ BlueprintNodeGraph is a powerful Unreal Engine plugin that provides a rich set o
 - StateTree requires a specialized editor
 
 **Our Solution:**
-- âœ?Drag nodes directly in standard Blueprint Editor
-- âœ?No need to learn a new editor
-- âœ?Fully compatible with your existing workflow
-- âœ?Learning cost is virtually zero
+- Drag nodes directly in standard Blueprint Editor
+- No need to learn a new editor
+- Fully compatible with your existing workflow
+- Learning cost is virtually zero
 
 #### 2. Out-of-the-box Async Execution
 
@@ -85,7 +85,8 @@ BlueprintNodeGraph is a powerful Unreal Engine plugin that provides a rich set o
 ```cpp
 // Just drag and use:
 Loop Delay (Duration: 1.0)
-    â†?Execute your logic
+    â†“
+Execute your logic
 ```
 
 No complex chart configuration needed, just use it!
@@ -100,16 +101,17 @@ RegisterWithGameInstance(WorldContext);  // Prevent collection
 SetReadyToDestroy();                    // Mark for destruction when complete
 ```
 
-- âœ?Automatic management, no manual cleanup
-- âœ?No memory leak risk
+- Automatic management, no manual cleanup
+- No memory leak risk
 
 #### 4. Timeout Protection Mechanism
 
 **File Location:** [ExLatentNodeInfo](Source/BlueprintNodeGraph/Public/BlueprintTool/Common/ExLatentProxyDefine.h)
 
 ```
-Node Properties â†?Configure Time Out: 10.0
-    â†?Automatic timeout protection
+Node Properties â†’ Configure Time Out: 10.0
+    â†“
+Automatic timeout protection
 ```
 
 Prevents infinite waiting!
@@ -119,7 +121,7 @@ Prevents infinite waiting!
 **File Location:** [ExBase_LatentTask.h](Source/BlueprintNodeGraph/Public/BlueprintTool/LatentTasks/ExBase_LatentTask.h)
 
 ```
-CreateTask() â†?Activate() â†?Receive On Start â†?Receive On Stop â†?Destroy
+CreateTask() â†’ Activate() â†’ Receive On Start â†’ Receive On Stop â†’ Destroy
 ```
 
 - Complete state machine management
@@ -129,20 +131,20 @@ CreateTask() â†?Activate() â†?Receive On Start â†?Receive On Stop â†?Destroy
 
 | Scenario | BlueprintNodeGraph | FlowGraph | StateTree |
 |----------|------------------|-----------|-----------|
-| **Loop Delay** | âœ?Loop Delay native node | Need to combine nodes | Not applicable (state machine model unsuitable for linear loop flow) |
-| **Multi-input Sync / Parallel Branches** | âœ?Wait Branches native node | Need nested Parallel nodes, complex hierarchy | Not applicable (state machine model doesn't support native parallel) |
-| **Async Loading / Conditional Wait** | âœ?Wait Condition native node | Need to build wait logic manually | Need to build event listeners manually, high implementation cost |
-| **Complex Tasks / Story / Level Flow** | âœ?Native adaptation, supports resume from checkpoint / network sync, validated in production | âœ?General flow framework, general adaptability, needs additional business adaptation | â?Not applicable, state machine model doesn't match linear + branching task logic |
-| **AI State Machine / Behavior Control** | Can implement (with Blueprint / events, not core advantage) | Can implement (needs lots of custom nodes) | âœ?Best fit, hierarchical state machine naturally adapts to AI behavior |
+| **Loop Delay** | Loop Delay native node | Need to combine nodes | Not applicable (state machine model unsuitable for linear loop flow) |
+| **Multi-input Sync / Parallel Branches** | Wait Branches native node | Need nested Parallel nodes, complex hierarchy | Not applicable (state machine model doesn't support native parallel) |
+| **Async Loading / Conditional Wait** | Wait Condition native node | Need to build wait logic manually | Need to build event listeners manually, high implementation cost |
+| **Complex Tasks / Story / Level Flow** | Native adaptation, supports resume from checkpoint / network sync, validated in production | General flow framework, general adaptability, needs additional business adaptation | Not applicable, state machine model doesn't match linear + branching task logic |
+| **AI State Machine / Behavior Control** | Can implement (with Blueprint / events, not core advantage) | Can implement (needs lots of custom nodes) | Best fit, hierarchical state machine naturally adapts to AI behavior |
 
 ### ðŸ’¬ One-line Summary
 
 > **BlueprintNodeGraph = FlowGraph's ease of use + StateTree's powerful features**
 
-- âœ?Simple scenarios: drag nodes directly, done in seconds
-- âœ?No new concepts to learn
-- âœ?Async support, out of the box
-- âœ?Simpler than FlowGraph, more direct than StateTree
+- Simple scenarios: drag nodes directly, done in seconds
+- No new concepts to learn
+- Async support, out of the box
+- Simpler than FlowGraph, more direct than StateTree
 
 ## Features
 
@@ -191,10 +193,12 @@ Add a simple delay loop in Blueprint:
 
 ```
 Event BeginPlay
-    â†?Loop Delay (Duration: 1.0)
-    â†?(Loop)
+    â†“
+Loop Delay (Duration: 1.0)
+    â†“ (Loop)
 Print String ("Hello!")
-    â†?(Completed)
+    â†“
+(Completed)
 Print String ("Done!")
 ```
 
@@ -207,12 +211,11 @@ That's it! See [Quick Start Guide](Docs/Usage.md#quick-start) for more.
 - **[Usage Guide](Docs/Usage.md)** - Complete usage guide, API reference, examples
 - **[Architecture Guide](Docs/Architecture.md)** - Deep dive into plugin architecture and how it works
 - **[Quest System Guide](Docs/QuestSystemGuide.md)** - Hierarchical quest system usage
-- **[Refactoring Plan](Docs/RefactoringPlan.md)** - Naming conventions and directory layout (completed)
 
 ### ðŸ”— Quick Links
 
-- [Installation Guide](Docs/Usage.md#installation)
-- [API Reference](Docs/Usage.md#basic-node-usage)
+- [Installation Guide](Docs/Usage.md)
+- [API Reference](Docs/Usage.md)
 - [Example Project](Content/BP_TestGraph1.uasset)
 - [Architecture Design](Docs/Architecture.md)
 
@@ -232,8 +235,8 @@ These examples are located in the `Content` folder.
 
 Having issues? Check:
 
-- [Troubleshooting](Docs/Usage.md#troubleshooting) - Solutions to common problems
-- [Best Practices](Docs/Usage.md#best-practices) - Usage tips and tricks
+- [Troubleshooting](Docs/Usage.md) - Solutions to common problems
+- [Best Practices](Docs/Usage.md) - Usage tips and tricks
 
 ### Reporting Issues
 
